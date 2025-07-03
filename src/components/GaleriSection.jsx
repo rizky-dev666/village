@@ -1,15 +1,38 @@
 import { useEffect, useState } from "react";
-import { galeriDummy } from "../components/data/galeriDummy";
 import { Card, CardContent } from "../components/ui/Card";
 import { Link } from "react-router-dom";
+import axios from "axios";
 
 export default function GaleriSection() {
   const [latestGaleri, setLatestGaleri] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
-    const sorted = [...galeriDummy].sort((a, b) => b.id - a.id);
-    setLatestGaleri(sorted.slice(0, 6)); // Ambil 6 galeri terbaru
+    const fetchGaleri = async () => {
+      try {
+        const res = await axios.get("/api/galeri", {
+          withCredentials: true,
+        });
+
+        // Mapping struktur data dari Supabase ke format FE
+        const mapped = res.data.map((item) => ({
+          id: item.id_galeri,
+          image: item.gambar_galeri,
+          caption: item.keterangan_gambar,
+          created_at: item.created_at,
+        }));
+
+        const sorted = mapped.sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
+
+        setLatestGaleri(sorted.slice(0, 6));
+      } catch (err) {
+        console.error("Gagal mengambil data galeri:", err);
+      }
+    };
+
+    fetchGaleri();
   }, []);
 
   return (

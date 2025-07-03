@@ -1,13 +1,38 @@
 import { useNavigate } from "react-router-dom";
-import beritaData from "../components/data/beritaData";
 import CardBerita from "../components/CardBerita";
+import { useEffect, useState } from "react";
+import axios from "axios";
 
 const BeritaSection = () => {
   const navigate = useNavigate();
+  const [berita, setBerita] = useState([]);
 
-  const beritaTerbaru = [...beritaData]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 3);
+  useEffect(() => {
+    const fetchBerita = async () => {
+      try {
+        const res = await axios.get("/api/berita");
+
+        const formatted = res.data
+          .map((item) => ({
+            id: item.id_berita,
+            judul: item.judul_berita,
+            isi: item.isi_berita,
+            penulis: item.penulis_berita || "Administrator",
+            gambar: item.gambar_berita,
+            dilihat: item.dilihat || 0,
+            createdAt: item.created_at,
+          }))
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          .slice(0, 3); // Ambil 3 berita terbaru
+
+        setBerita(formatted);
+      } catch (err) {
+        console.error("Gagal mengambil data berita:", err);
+      }
+    };
+
+    fetchBerita();
+  }, []);
 
   return (
     <section className="bg-[#f7f7f7] py-12">
@@ -22,7 +47,7 @@ const BeritaSection = () => {
 
         {/* Kartu Berita */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {beritaTerbaru.map((item) => (
+          {berita.map((item) => (
             <div
               key={item.id}
               onClick={() =>

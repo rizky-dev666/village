@@ -11,14 +11,15 @@ import {
 } from "recharts";
 import axios from "axios";
 
-const prosesDataPerkawinan = (dataArray) => {
+const prosesDataBangunan = (dataArray) => {
   if (!Array.isArray(dataArray)) return [];
 
   const kategori = [
-    { key: "belum_kawin", label: "Belum Kawin" },
-    { key: "kawin", label: "Kawin" },
-    { key: "cerai_hidup", label: "Cerai Hidup" },
-    { key: "cerai_mati", label: "Cerai Mati" },
+    { key: "milik_sendiri", label: "Milik Sendiri" },
+    { key: "sewa", label: "Sewa" },
+    { key: "bebas_sewa", label: "Bebas Sewa" },
+    { key: "dinas", label: "Dinas" },
+    { key: "lainnya", label: "Lainnya" },
   ];
 
   return kategori.map(({ key, label }) => {
@@ -26,11 +27,11 @@ const prosesDataPerkawinan = (dataArray) => {
       (total, item) => total + (parseInt(item[key]) || 0),
       0
     );
-    return { status: label, jumlah };
+    return { kepemilikan: label, jumlah };
   });
 };
 
-const PerkawinanChart = ({ tahun, kode_sls }) => {
+const BangunanChart = ({ tahun, kode_sls }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -38,56 +39,56 @@ const PerkawinanChart = ({ tahun, kode_sls }) => {
   useEffect(() => {
     if (!tahun) return;
 
-    const fetchPerkawinan = async () => {
+    const fetchBangunan = async () => {
       setLoading(true);
       try {
-        const response = await axios.get("/api/data-perkawinan/tahun", {
+        const response = await axios.get("/api/data-bangunan/tahun", {
           params: kode_sls ? { tahun, kode_sls } : { tahun },
         });
 
         const arrayData = Array.isArray(response.data) ? response.data : [];
-        const processed = prosesDataPerkawinan(arrayData);
+        const processed = prosesDataBangunan(arrayData);
         setData(processed);
       } catch (err) {
-        console.error("Gagal memuat data perkawinan:", err);
+        console.error("Gagal memuat data bangunan:", err);
         setError("Gagal memuat data");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPerkawinan();
+    fetchBangunan();
   }, [tahun, kode_sls]);
 
   if (!tahun) return null;
-  if (loading) return <p>Memuat data perkawinan...</p>;
+  if (loading) return <p>Memuat data kepemilikan bangunan...</p>;
   if (error) return <p className="text-red-500">{error}</p>;
-  if (!data.length) return <p>Data perkawinan tidak tersedia.</p>;
+  if (!data.length) return <p>Data kepemilikan bangunan tidak tersedia.</p>;
 
   const maxJumlah = Math.max(...data.map((item) => item.jumlah), 0);
 
   return (
-    <ResponsiveContainer width="100%" height={data.length * 75}>
+    <ResponsiveContainer width="100%" height={data.length * 65}>
       <BarChart
         layout="vertical"
         data={data}
         margin={{ top: 5, right: 35, left: 10, bottom: 5 }}
       >
         <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-        <XAxis type="number" domain={[0, maxJumlah + 20]} hide />
+        <XAxis type="number" domain={[0, maxJumlah + 5]} hide />
         <YAxis
           type="category"
-          dataKey="status"
-          width={100}
+          dataKey="kepemilikan"
+          width={140}
           tick={{ fontSize: 12 }}
           axisLine={false}
           tickLine={false}
         />
         <Tooltip
-          cursor={{ fill: "rgba(240, 240, 240, 0.5)" }}
-          formatter={(value) => [`${value} Orang`, "Jumlah"]}
+          formatter={(value) => [`${value} Unit`, "Jumlah"]}
+          cursor={{ fill: "rgba(240,240,240,0.5)" }}
         />
-        <Bar dataKey="jumlah" radius={[0, 4, 4, 0]} fill="#22c55e">
+        <Bar dataKey="jumlah" radius={[0, 4, 4, 0]} fill="#10b981">
           <LabelList
             dataKey="jumlah"
             position="right"
@@ -99,4 +100,4 @@ const PerkawinanChart = ({ tahun, kode_sls }) => {
   );
 };
 
-export default PerkawinanChart;
+export default BangunanChart;

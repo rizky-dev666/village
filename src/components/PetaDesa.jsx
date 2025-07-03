@@ -1,9 +1,10 @@
-import React, { memo } from "react";
+import React, { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import axios from "axios";
 
-// Perbaikan untuk ikon marker
+// Perbaikan ikon marker
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -14,41 +15,47 @@ L.Icon.Default.mergeOptions({
 
 const centerPosition = [-7.6755, 108.139];
 
-// --- PERUBAHAN DIMULAI DI SINI ---
-
-// 1. Tentukan Batas Wilayah Peta
-// Ini adalah koordinat untuk sudut Barat Daya dan Timur Laut dari "kotak" batas.
-const corner1 = L.latLng(-7.695, 108.12); // Sudut kiri bawah
-const corner2 = L.latLng(-7.655, 108.16); // Sudut kanan atas
+// Batas wilayah peta
+const corner1 = L.latLng(-6.160320, 105.876246);
+const corner2 = L.latLng(-6.208750, 106.818944);
 const maxBounds = L.latLngBounds(corner1, corner2);
 
-// --- AKHIR DARI PERUBAHAN ---
-
-const rwData = [
-  { id: 1, nama: "RW 1", posisi: [-7.675, 108.138] },
-  { id: 2, nama: "RW 2", posisi: [-7.6745, 108.1395] },
-  { id: 3, nama: "RW 3", posisi: [-7.676, 108.1405] },
-  { id: 4, nama: "RW 4", posisi: [-7.677, 108.139] },
-  { id: 5, nama: "RW 5", posisi: [-7.6765, 108.1375] },
-  { id: 6, nama: "RW 6", posisi: [-7.6735, 108.1365] },
-  { id: 7, nama: "RW 7", posisi: [-7.678, 108.1415] },
-  { id: 8, nama: "RW 8", posisi: [-7.674, 108.142] },
-  { id: 9, nama: "RW 9", posisi: [-7.6725, 108.139] },
-  { id: 10, nama: "RW 10", posisi: [-7.679, 108.1385] },
-  { id: 11, nama: "RW 11", posisi: [-7.6758, 108.143] },
-  { id: 12, nama: "RW 12", posisi: [-7.6775, 108.136] },
-];
-
 const PetaDesa = ({ setSelectedRW }) => {
+  const [rwData, setRwData] = useState([]);
+
+  useEffect(() => {
+    const getRWData = async () => {
+      try {
+        const response = await axios.get("/api/data-domisili");
+        const data = response.data;
+
+        const formattedData = data.map((item, index) => {
+          const [latStr, lngStr] = item.koordinat.split(","); // misal: "-7.655, 108.16"
+          const lat = parseFloat(latStr);
+          const lng = parseFloat(lngStr);
+          return {
+            id: item.kode_sls,
+            nama: `RW ${item.rw} RT ${item.rt}`,
+            posisi: [lat, lng],
+          };
+        });
+
+        setRwData(formattedData);
+      } catch (error) {
+        console.error("Gagal mengambil data RW:", error);
+      }
+    };
+
+    getRWData();
+  }, []);
+console.log(rwData)
   return (
     <MapContainer
       center={centerPosition}
       zoom={16}
       style={{ height: "100%", width: "100%" }}
-      // --- PERUBAHAN DIMULAI DI SINI ---
-      maxBounds={maxBounds} // 2. Terapkan batas wilayah
-      minZoom={15} // 3. Terapkan batas zoom out
-      // --- AKHIR DARI PERUBAHAN ---
+      maxBounds={maxBounds}
+      minZoom={15}
     >
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -61,7 +68,7 @@ const PetaDesa = ({ setSelectedRW }) => {
           position={rw.posisi}
           eventHandlers={{
             click: () => {
-              setSelectedRW(rw.nama);
+              setSelectedRW(rw.id);
             },
           }}
         >
@@ -76,4 +83,4 @@ const PetaDesa = ({ setSelectedRW }) => {
   );
 };
 
-export default memo(PetaDesa);
+export default PetaDesa;

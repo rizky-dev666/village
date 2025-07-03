@@ -1,170 +1,242 @@
-import React, { useState, useCallback } from "react";
-import PetaDesa from "../../components/PetaDesa";
-import statistikData from "../../components/data/statistikData.js";
-// 1. PERBAIKAN: Impor semua ikon yang kita butuhkan
-import {
-  FaUsers,
-  FaHome,
-  FaMale,
-  FaFemale,
-  FaMosque,
-  FaCross,
-  FaYinYang,
-} from "react-icons/fa";
-
-// Impor semua komponen grafik (AgamaChart tidak akan dipakai lagi di sini)
+import { useEffect, useState,useRef } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import axios from "axios";
 import PiramidaPendudukChart from "../../components/charts/PiramidaPendudukChart";
 import DusunChart from "../../components/charts/DusunChart";
 import PendidikanChart from "../../components/charts/PendidikanChart";
-import PekerjaanChart from "../../components/charts/PekerjaanChart";
 import PerkawinanChart from "../../components/charts/PerkawinanChart";
-// import AgamaChart from "../../components/charts/AgamaChart"; // Tidak perlu lagi
+import AgamaChart from "../../components/charts/AgamaChart";
+import PekerjaanChart from "../../components/charts/PekerjaanChart";
+import TernakChart from "../../components/TernakChart";
+import BangunanChart from "../../components/BangunanChart";
 
-// 2. PERBAIKAN: Menggunakan definisi Card dengan gaya terbaru
-const Card = ({ title, value, icon }) => (
-  <div className="bg-white p-5 rounded-3xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full">
-    <div className="flex items-center gap-3">
-      <div className="bg-green-100 text-green-700 text-xl p-2.5 rounded-full">
-        {icon}
-      </div>
-      <h3 className="text-sm text-gray-500 font-medium">{title}</h3>
-    </div>
-    <p className="text-3xl font-bold text-green-800 mt-3">{value}</p>
-  </div>
-);
+const pinIcon = new L.Icon({
+  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
 
-const SectionTitle = ({ children, className }) => (
-  <h2 className={`text-xl font-bold text-green-700 mb-2 ${className}`}>
-    {children}
-  </h2>
-);
+function FitBounds({ domisili }) {
+  const map = useMap();
 
-const Penduduk = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState("2025 - Semester 1");
-  const [selectedRW, setSelectedRW] = useState("RW 1");
+  useEffect(() => {
+    if (domisili.length > 0) {
+      const bounds = domisili.map((item) => {
+        const [lat, lng] = item.koordinat.split(",").map(Number);
+        return [lat, lng];
+      });
+      map.fitBounds(bounds);
+    }
+  }, [domisili, map]);
 
-  const data = statistikData[selectedPeriod]?.[selectedRW] || {};
+  return null;
+}
 
-  const handleRWSelect = useCallback((rwNama) => {
-    setSelectedRW(rwNama);
+
+export default function Penduduk() {
+  const [domisili, setDomisili] = useState([]);
+  const [tahunList, setTahunList] = useState([]);
+  const [selectedTahun, setSelectedTahun] = useState("");
+  const [selectedRT, setSelectedRT] = useState(null);
+  const [statistik, setStatistik] = useState(null);
+  const [semuaStatistik, setSemuaStatistik] = useState([]);
+
+  // API CALL
+  const fetchDomisili = async () => {
+    const res = await axios.get("/api/data-domisili");
+    setDomisili(res.data);
+  };
+
+  const fetchTahunList = async () => {
+    const res = await axios.get("/api/data-penduduk");
+    const data = res.data;
+    const unique = [...new Set(data.map((item) => item.tahun))];
+    setTahunList(unique);
+
+    const currentYear = new Date().getFullYear().toString();
+    const availableYear = unique.includes(currentYear)
+      ? currentYear
+      : unique[0];
+    setSelectedTahun(availableYear);
+    setSemuaStatistik(data);
+  };
+
+  const fetchStatistik = (tahun, kode_sls, rt) => {
+    const data = semuaStatistik.find(
+      (item) =>
+        item.tahun === tahun &&
+        item.sls.kode_sls === kode_sls &&
+        item.sls.rt === rt
+    );
+    setStatistik(data);
+  };
+
+  const getTotalStatistik = () => {
+    const filtered = semuaStatistik.filter(
+      (item) => item.tahun === selectedTahun
+    );
+    return filtered.reduce(
+      (acc, curr) => ({
+        perempuan: acc.perempuan + curr.perempuan,
+        laki_laki: acc.laki_laki + curr.laki_laki,
+        keluarga: acc.keluarga + curr.keluarga,
+      }),
+      { perempuan: 0, laki_laki: 0, keluarga: 0 }
+    );
+  };
+
+  useEffect(() => {
+    fetchDomisili();
+    fetchTahunList();
   }, []);
 
+  useEffect(() => {
+    if (selectedTahun && selectedRT) {
+      fetchStatistik(selectedTahun, selectedRT.kode_sls, selectedRT.rt);
+    }
+  }, [selectedTahun, selectedRT]);
+
+  const displayedStatistik =
+    selectedRT && statistik
+      ? statistik
+      : selectedTahun
+      ? getTotalStatistik()
+      : null;
+
+  const judul = selectedRT
+    ? `📍 Data untuk SLS ${selectedRT.kode_sls} RT ${selectedRT.rt}`
+    : selectedTahun
+    ? "📊 Data semua di desa"
+    : "";
+
   return (
-    <div className="mt-4 space-y-8">
-      {/* Peta dan Kontrol */}
-      <div>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-          <h2 className="text-xl font-bold text-green-700">
-            Peta Sebaran & Statistik Penduduk
-          </h2>
-          <select
-            className="border border-gray-300 rounded-md px-4 py-2 shadow-sm"
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-          >
-            {Object.keys(statistikData).map((period) => (
-              <option key={period} value={period}>
-                {period}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="relative w-full h-[55vh] bg-gray-100 rounded-2xl shadow-lg overflow-hidden border-2 border-green-600 z-0">
-          <PetaDesa setSelectedRW={handleRWSelect} />
-        </div>
-        <p className="mt-2 text-sm text-gray-700">
-          RW terpilih: <span className="font-semibold">{selectedRW}</span>. Klik
-          penanda di peta untuk mengubah data statistik.
-        </p>
-      </div>
+    <div className="p-6 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Statistik Penduduk</h1>
 
-      {/* Kartu Statistik Utama */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card
-          title="Jumlah Penduduk"
-          value={`${data.totalPenduduk || 0} Jiwa`}
-          icon={<FaUsers />}
-        />
-        <Card
-          title="Jumlah Kepala Keluarga"
-          value={`${data.kepalaKeluarga || 0} KK`}
-          icon={<FaHome />}
-        />
-        <Card
-          title="Jumlah Laki-Laki"
-          value={`${data.lakiLaki || 0} Jiwa`}
-          icon={<FaMale />}
-        />
-        <Card
-          title="Jumlah Perempuan"
-          value={`${data.perempuan || 0} Jiwa`}
-          icon={<FaFemale />}
-        />
-      </div>
+      <select
+        className="mb-4 p-2 border"
+        value={selectedTahun}
+        onChange={(e) => {
+          setSelectedTahun(e.target.value);
+          setSelectedRT(null);
+          setStatistik(null);
+        }}
+      >
+        <option value="">Pilih Tahun</option>
+        {tahunList.map((tahun, idx) => (
+          <option key={idx} value={tahun}>
+            {tahun}
+          </option>
+        ))}
+      </select>
 
-      {/* Grafik Kelompok Umur */}
-      <div>
-        <SectionTitle className="text-green-700">
-          Berdasarkan Kelompok Umur
-        </SectionTitle>
-        <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg mt-2 p-4 border">
-          <PiramidaPendudukChart data={data.kelompokUmur} />
+<MapContainer
+  center={[-7.2575, 112.7521]} // ini tidak masalah, nanti di-override oleh fitBounds
+  zoom={13}
+  style={{ height: "400px", width: "100%" }}
+>
+  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+  <FitBounds domisili={domisili} />
+
+  {domisili.map((item, idx) => {
+    const [lat, lng] = item.koordinat.split(",").map(Number);
+    return (
+      <Marker
+        key={idx}
+        position={[lat, lng]}
+        icon={pinIcon}
+        eventHandlers={{
+          click: () => setSelectedRT(item),
+        }}
+      >
+        <Popup>
+          RT {item.rt} / RW {item.rw}
+        </Popup>
+      </Marker>
+    );
+  })}
+</MapContainer>
+
+
+      {displayedStatistik ? (
+        <div className="mt-6">
+          <h2 className="text-lg font-semibold mb-2">{judul}</h2>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="p-4 bg-blue-100 rounded">
+              👩 Perempuan: {displayedStatistik.perempuan}
+            </div>
+            <div className="p-4 bg-green-100 rounded">
+              👨 Laki-laki: {displayedStatistik.laki_laki}
+            </div>
+            <div className="p-4 bg-yellow-100 rounded">
+              🏠 Keluarga: {displayedStatistik.keluarga}
+            </div>
+            <div className="p-4 bg-purple-100 rounded">
+              👥 Total Penduduk:{" "}
+              {displayedStatistik.perempuan + displayedStatistik.laki_laki}
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <p className="mt-4">Pilih tahun untuk melihat data penduduk.</p>
+      )}
 
-      {/* Grid untuk semua grafik lainnya */}
-      <div className="grid md:grid-cols-2 gap-8">
+      <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg mt-2 p-4 border">
+        <PiramidaPendudukChart tahun={selectedTahun} />
+      </div>
+       <div className="grid md:grid-cols-1 gap-8">
         {/* ... Grafik Dusun, Pendidikan, Pekerjaan, Perkawinan ... */}
         <div>
-          <SectionTitle> Berdasarkan Dusun </SectionTitle>
+          Berdasarkan Dusun
           <div className="bg-white rounded-2xl shadow mt-2 p-4 h-[340px] flex items-center justify-center">
-            <DusunChart data={data.dusun} />
+            <DusunChart tahun={selectedTahun} />
           </div>
         </div>
         <div>
-          <SectionTitle> Berdasarkan Pendidikan </SectionTitle>
-          <div className="bg-white rounded-2xl shadow mt-2 p-4 h-[340px]">
-            <PendidikanChart data={data.pendidikan} />
-          </div>
-        </div>
-        <div>
-          <SectionTitle> Berdasarkan Pekerjaan </SectionTitle>
-          <div className="bg-white rounded-2xl shadow mt-2 p-4 h-[340px]">
-            <PekerjaanChart data={data.pekerjaan} />
-          </div>
-        </div>
-        <div>
-          <SectionTitle> Berdasarkan Perkawinan </SectionTitle>
-          <div className="bg-white rounded-2xl shadow mt-2 p-4 h-[340px]">
-            <PerkawinanChart data={data.perkawinan} />
-          </div>
-        </div>
-      </div>
+          Pendidikan
+          <div className="bg-white rounded-2xl shadow mt-2 p-4 h-[340px] flex items-center justify-center">
+            <PendidikanChart
+  tahun={selectedTahun}
+  sls={selectedRT?.kode_sls}
+/>
 
-      {/* 3. PERBAIKAN: Bagian Agama diubah menjadi layout kartu */}
-      <div>
-        <SectionTitle> Berdasarkan Agama </SectionTitle>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-2">
-          {data.agama?.map((item) => (
-            <Card
-              key={item.nama}
-              title={item.nama}
-              value={`${item.jumlah || 0} Jiwa`}
-              icon={
-                item.nama === "Islam" ? (
-                  <FaMosque />
-                ) : item.nama === "Kristen" ? (
-                  <FaCross />
-                ) : (
-                  <FaYinYang />
-                ) // Ikon default
-              }
-            />
-          ))}
+          </div>
+          <div>
+          Berdasarkan Perkawinan 
+          <div className="bg-white rounded-2xl shadow mt-2 p-4 h-[340px]">
+            <PerkawinanChart tahun={selectedTahun} kode_sls={selectedRT?.kode_sls} />
+
+          </div>
         </div>
-      </div>
+        </div>
+        <div>
+         Berdasarkan pekerjaan 
+          <div className="bg-white rounded-2xl shadow mt-2 p-4 h-[340px]">
+            <PekerjaanChart tahun={selectedTahun}   />
+          </div>
+        </div>
+        <div>
+         Berdasarkan ternak 
+          <div className="bg-white rounded-2xl shadow mt-2 p-4 h-[340px]">
+            <TernakChart tahun={selectedTahun} kode_sls={selectedRT?.kode_sls} />
+          </div>
+        </div>
+        <div>
+         Berdasarkan bangunan 
+          <div className="bg-white rounded-2xl shadow mt-2 p-4 h-[340px]">
+            <BangunanChart tahun={selectedTahun} kode_sls={selectedRT?.kode_sls} />
+          </div>
+        </div>
+          <div>
+          Berdasarkan Agama 
+          <div className="bg-white rounded-2xl shadow mt-2 p-4 h-[340px]">
+            <AgamaChart tahun={selectedTahun} kode_sls={selectedRT?.kode_sls} />
+
+          </div>
+        </div>
+        </div>
     </div>
   );
-};
-
-export default Penduduk;
+}

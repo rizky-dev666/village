@@ -7,7 +7,7 @@ const navItems = [
   { name: 'Profil Desa', path: '/profil' },
   { name: 'Statistik', path: '/statistik' },
   { name: 'Berita', path: '/berita' },
-  { name: 'Bumdes', path: '/bumdes' },
+  { name: 'Potensi Ekonomi', path: '/bumdes' },
   { name: 'Galeri', path: '/galeri' },
 ];
 

@@ -1,13 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react"; // pastikan sudah install
-
-const heroImages = [
-  "/assets/hero1.png",
-  "/assets/hero2.png",
-  "/assets/hero3.png",
-];
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import axios from "axios";
 
 const HeroSection = () => {
+  const [heroImages, setHeroImages] = useState([]);
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const nextSlide = () => {
@@ -19,35 +15,57 @@ const HeroSection = () => {
   };
 
   useEffect(() => {
+    const fetchBanner = async () => {
+      try {
+        const res = await axios.get("/api/banner", {
+          withCredentials: true,
+        });
+
+        const aktif = res.data.filter((item) => item.tampilkan === true);
+        setHeroImages(aktif.map((item) => item.gambar_banner));
+      } catch (error) {
+        console.error("Gagal mengambil data banner:", error);
+      }
+    };
+
+    fetchBanner();
+  }, []);
+
+  useEffect(() => {
     const interval = setInterval(nextSlide, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [heroImages]);
+
+  if (heroImages.length === 0) {
+    return (
+      <section className="flex items-center justify-center h-[80vh] md:h-screen bg-gray-100">
+        <p className="text-gray-600 text-lg">Memuat gambar banner...</p>
+      </section>
+    );
+  }
 
   return (
     <section className="relative w-full h-[80vh] md:h-screen overflow-hidden">
-      {/* Background Image */}
+      {/* Gambar background */}
       <img
         src={heroImages[currentSlide]}
         alt="hero"
         className="absolute inset-0 w-full h-full object-cover z-0"
       />
 
-      {/* Teks di kiri */}
+      {/* Teks di atas gambar */}
       <div className="absolute inset-0 flex items-center justify-start z-10 px-4 sm:px-8 md:px-20">
-        <div className="max-w-xl text-left text-white space-y-3 md:bg-transparent p-4 md:p-0 rounded-md">
+        <div className="max-w-xl text-left text-white space-y-3 p-4 md:p-6 rounded-md">
           <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold drop-shadow-lg">
             Selamat Datang di
           </h1>
           <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold drop-shadow-lg">
             Website Resmi Desa Cikupa
           </h2>
-          <p className="text-base sm:text-lg md:text-xl drop-shadow-lg">
-            Sumber informasi tentang Desa Cikupa
-          </p>
         </div>
       </div>
 
-      {/* Tombol Navigasi */}
+      {/* Tombol navigasi slide */}
       <div className="absolute bottom-4 sm:bottom-6 left-1/2 transform -translate-x-1/2 flex gap-3 z-10">
         <button
           onClick={prevSlide}

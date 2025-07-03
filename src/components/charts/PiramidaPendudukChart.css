@@ -1,0 +1,9 @@
+.piramida-wrapper {
+  display: flex;
+  width: 100%;
+  height: 200px;
+}
+
+.piramida-chart {
+  flex: 1;
+}

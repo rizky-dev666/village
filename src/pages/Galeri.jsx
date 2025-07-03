@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { galeriDummy } from "../components/data/galeriDummy";
 import { Card, CardContent } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -10,12 +9,33 @@ export default function GaleriPage() {
   const [data, setData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
 
   useEffect(() => {
-    const sorted = [...galeriDummy].sort((a, b) => b.id - a.id);
-    setData(sorted);
+    const fetchGaleri = async () => {
+      try {
+        const response = await fetch("/api/galeri");
+        const result = await response.json();
+
+        // Mapping nama field dari Supabase agar cocok dengan FE
+        const mapped = result.map((item) => ({
+          id: item.id_galeri,
+          image: item.gambar_galeri,
+          caption: item.keterangan_gambar,
+        }));
+
+        const sorted = mapped.sort((a, b) => b.id - a.id);
+        setData(sorted);
+      } catch (error) {
+        console.error("Gagal memuat data galeri:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGaleri();
   }, []);
 
   const paginatedData = data.slice(
@@ -30,10 +50,16 @@ export default function GaleriPage() {
     }
   };
 
+  if (loading) {
+    return <p className="text-center py-10 text-gray-600">Memuat galeri...</p>;
+  }
+
   return (
     <div className="min-h-screen py-10 bg-[#f7f7f7]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-green-700 mb-2">Galeri Desa</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-green-700 mb-2">
+          Galeri Desa
+        </h2>
         <p className="mb-6 text-gray-600 text-sm sm:text-base">
           Dokumentasi kegiatan yang berlangsung di Desa Cikupa
         </p>
@@ -103,7 +129,9 @@ export default function GaleriPage() {
               alt="Detail"
               className="w-full h-auto rounded-xl mb-3"
             />
-            <p className="text-center text-gray-800 text-sm sm:text-base">{selectedImage.caption}</p>
+            <p className="text-center text-gray-800 text-sm sm:text-base">
+              {selectedImage.caption}
+            </p>
           </div>
         </div>
       )}
