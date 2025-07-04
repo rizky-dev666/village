@@ -33,7 +33,6 @@ const kategori = [
 
 const prosesDataGabungan = (dataArray) => {
   if (!Array.isArray(dataArray)) return [];
-
   return kategori.map(({ key, label }) => {
     const jumlah = dataArray.reduce(
       (total, item) => total + (parseInt(item[key]) || 0),
@@ -43,12 +42,20 @@ const prosesDataGabungan = (dataArray) => {
   });
 };
 
-const CustomBar = ({ x, y, width, height, fill, payload }) => {
-  if (payload.jumlah === 0) return null;
+const CustomBar = ({ x, y, width, height, fill }) => {
+  if (!height) return null;
   const minH = 2;
   const adjustedHeight = height < minH ? minH : height;
   const adjustedY = height < minH ? y - (minH - height) : y;
-  return <rect x={x} y={adjustedY} width={width} height={adjustedHeight} fill={fill} />;
+  return (
+    <rect
+      x={x}
+      y={adjustedY}
+      width={width}
+      height={adjustedHeight}
+      fill={fill}
+    />
+  );
 };
 
 const PendidikanChart = ({ tahun, sls }) => {
@@ -57,24 +64,17 @@ const PendidikanChart = ({ tahun, sls }) => {
 
   useEffect(() => {
     if (!tahun) return;
-
     const fetchData = async () => {
       setStatus("loading");
-
       try {
         const res = await axios.get("/api/data-pendidikan/tahun", {
-          params: {
-            tahun,
-            ...(sls ? { sls } : {}),
-          },
+          params: { tahun, ...(sls && { sls }) },
         });
-
         const hasil = res.data;
         if (!hasil || hasil.length === 0) {
           setStatus("nodata");
           return;
         }
-
         const processed = prosesDataGabungan(hasil);
         setData(processed);
         setStatus("success");
@@ -83,46 +83,40 @@ const PendidikanChart = ({ tahun, sls }) => {
         setStatus("error");
       }
     };
-
     fetchData();
   }, [tahun, sls]);
 
-  if (!tahun) return null;
-  if (status === "loading") return <p>Memuat data pendidikan...</p>;
-  if (status === "error") return <p className="text-red-500">Gagal memuat data.</p>;
-  if (status === "nodata") return <p>Tidak ada data pendidikan pada tahun ini.</p>;
+  if (status === "loading")
+    return <p className="text-center text-sm">Memuat data...</p>;
+  if (status === "error")
+    return <p className="text-center text-red-500">Gagal memuat data.</p>;
+  if (status === "nodata")
+    return <p className="text-center text-gray-500">Data tidak tersedia.</p>;
 
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <BarChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 30 }}>
+      <BarChart
+        data={data}
+        margin={{ top: 5, right: 20, left: -10, bottom: 60 }}
+      >
         <CartesianGrid strokeDasharray="3 3" />
+        {/* Mengubah tick menjadi miring */}
         <XAxis
           dataKey="nama"
           interval={0}
-          tick={(props) => {
-            const { x, y, payload } = props;
-            const words = payload.value.split(" ");
-            return (
-              <g transform={`translate(${x},${y + 10})`}>
-                {words.map((word, index) => (
-                  <text
-                    key={index}
-                    x={0}
-                    y={index * 12}
-                    textAnchor="middle"
-                    fontSize={12}
-                    fill="#666"
-                  >
-                    {word}
-                  </text>
-                ))}
-              </g>
-            );
-          }}
+          angle={-45}
+          textAnchor="end"
+          height={70}
+          tick={{ fontSize: 12 }}
         />
         <YAxis />
         <Tooltip formatter={(value) => [`${value} Orang`, "Jumlah"]} />
-        <Bar dataKey="jumlah" fill="#3b82f6" name="Jumlah" shape={<CustomBar />} />
+        <Bar
+          dataKey="jumlah"
+          fill="#3b82f6"
+          name="Jumlah"
+          shape={<CustomBar />}
+        />
       </BarChart>
     </ResponsiveContainer>
   );

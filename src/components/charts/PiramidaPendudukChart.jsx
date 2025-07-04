@@ -1,4 +1,4 @@
-import  { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -6,20 +6,29 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  LabelList,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 import axios from "axios";
-import "./PiramidaPendudukChart.css";
 
-// Urutan kelompok umur
+// Urutan kelompok umur (tidak berubah)
 const ageOrder = [
-  "0-4 Tahun", "5-9 Tahun", "10-14 Tahun", "15-19 Tahun", "20-24 Tahun",
-  "25-29 Tahun", "30-34 Tahun", "35-39 Tahun", "40-44 Tahun",
-  "45-49 Tahun", "50-54 Tahun", "55-59 Tahun", "60+ Tahun"
+  "0-4 Tahun",
+  "5-9 Tahun",
+  "10-14 Tahun",
+  "15-19 Tahun",
+  "20-24 Tahun",
+  "25-29 Tahun",
+  "30-34 Tahun",
+  "35-39 Tahun",
+  "40-44 Tahun",
+  "45-49 Tahun",
+  "50-54 Tahun",
+  "55-59 Tahun",
+  "60+ Tahun",
 ];
 
-// Fungsi untuk membuat label umur dari usia mentah
+// Fungsi-fungsi pemrosesan data (tidak berubah)
 const getUmurLabel = (umur) => {
   umur = parseInt(umur);
   if (isNaN(umur)) return null;
@@ -28,60 +37,62 @@ const getUmurLabel = (umur) => {
   const end = start + 4;
   return `${start}-${end} Tahun`;
 };
-
-// Support nama properti laki-laki yang berbeda
-const getLakiLakiValue = (item) => item.laki_laki ?? item.laki ?? item.jumlah_laki ?? 0;
-
-// Bersihkan nilai numerik
+const getLakiLakiValue = (item) =>
+  item.laki_laki ?? item.laki ?? item.jumlah_laki ?? 0;
 const cleanNumber = (value) => {
   const num = Number(value);
   return isNaN(num) ? 0 : num;
 };
-
-// Kelompokkan data usia untuk chart
 const processDataForChart = (data) => {
   if (!data || !Array.isArray(data)) return [];
-
   const grouped = {};
-
   data.forEach((item) => {
     const umur = parseInt(item.umur);
     const groupLabel = getUmurLabel(umur);
     if (!groupLabel) return;
-
     const laki = cleanNumber(getLakiLakiValue(item));
     const perempuan = cleanNumber(item.perempuan);
-
     if (!grouped[groupLabel]) {
       grouped[groupLabel] = { laki: 0, perempuan: 0 };
     }
-
     grouped[groupLabel].laki += laki;
     grouped[groupLabel].perempuan += perempuan;
   });
-
   const result = Object.entries(grouped).map(([label, counts]) => ({
     umurLabel: label,
     laki: counts.laki,
     perempuan: counts.perempuan,
   }));
-
   return result.sort(
     (a, b) => ageOrder.indexOf(a.umurLabel) - ageOrder.indexOf(b.umurLabel)
   );
 };
 
+// Komponen Tooltip Kustom untuk menampilkan detail L/P
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-3 border border-gray-300 rounded-lg shadow-lg text-sm">
+        <p className="font-bold text-gray-800 mb-2">{`${label}`}</p>
+        {payload.map((pld) => (
+          <p key={pld.dataKey} style={{ color: pld.fill }}>
+            {`${pld.name}: ${pld.value.toLocaleString()}`}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 // Komponen utama chart
 const PiramidaPendudukChart = ({ tahun }) => {
   const [chartData, setChartData] = useState([]);
-  const [maxValue, setMaxValue] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!tahun) {
-      setChartData([]);
-      return;
-    }
-
+    if (!tahun) return;
+    setLoading(true);
     const fetchData = async () => {
       try {
         const response = await axios.get(
@@ -89,91 +100,57 @@ const PiramidaPendudukChart = ({ tahun }) => {
         );
         const processed = processDataForChart(response.data);
         setChartData(processed);
-
-        const max = Math.max(
-          ...processed.map((d) => Math.max(d.laki, d.perempuan))
-        );
-        setMaxValue(Math.ceil(max / 10) * 10);
       } catch (error) {
         console.error("Gagal mengambil data umur:", error);
         setChartData([]);
+      } finally {
+        setLoading(false);
       }
     };
-
     fetchData();
   }, [tahun]);
 
-  if (!tahun) return null;
-  if (!chartData.length)
+  if (loading) {
+    return <p className="text-center text-gray-500 mt-4">Memuat data...</p>;
+  }
+  if (!chartData.length) {
     return (
       <p className="text-center text-gray-500 mt-4">
         Tidak ada data untuk tahun <strong>{tahun}</strong>
       </p>
     );
+  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
-      <div style={{ display: "flex", width: "100%", height: 400 }}>
-        {/* Laki-laki */}
-        <div style={{ flex: 1 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              layout="vertical"
-              margin={{ top: 20, right: 0, left: 100, bottom: 20 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" domain={[0, maxValue]} reversed tick={{ fontSize: 12 }} />
-              <YAxis dataKey="umurLabel" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Bar dataKey="laki" name="Laki-laki" fill="#4ade80">
-                <LabelList dataKey="laki" position="insideLeft" />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Perempuan */}
-        <div style={{ flex: 1 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              layout="vertical"
-              margin={{ top: 20, right: 100, left: 0, bottom: 20 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" domain={[0, maxValue]} tick={{ fontSize: 12 }} />
-              <YAxis dataKey="umurLabel" type="category" hide />
-              <Tooltip />
-              <Bar dataKey="perempuan" name="Perempuan" fill="#fb923c">
-                <LabelList dataKey="perempuan" position="insideRight" />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          marginTop: 10,
-          gap: 20,
-          fontSize: 14,
-          alignItems: "center",
+    <ResponsiveContainer width="100%" height={500}>
+      <BarChart
+        data={chartData}
+        layout="vertical"
+        margin={{
+          top: 5,
+          right: 20,
+          left: 30, // Memberi ruang ekstra untuk label
+          bottom: 20,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 16, height: 16, backgroundColor: "#4ade80", borderRadius: 2 }}></div>
-          <span>Laki-laki</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 16, height: 16, backgroundColor: "#fb923c", borderRadius: 2 }}></div>
-          <span>Perempuan</span>
-        </div>
-      </div>
-    </div>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis type="number" tick={{ fontSize: 12 }} />
+        <YAxis
+          dataKey="umurLabel"
+          type="category"
+          width={90} // Lebar area label
+          tick={{ fontSize: 11 }} // Ukuran font label dikecilkan
+          interval={0} // Tampilkan semua label
+        />
+        <Tooltip
+          content={<CustomTooltip />}
+          cursor={{ fill: "rgba(240, 240, 240, 0.6)" }}
+        />
+        <Legend wrapperStyle={{ paddingTop: "10px" }} />
+        <Bar dataKey="laki" name="Laki-laki" fill="#4ade80" barSize={12} />
+        <Bar dataKey="perempuan" name="Perempuan" fill="#fb923c" barSize={12} />
+      </BarChart>
+    </ResponsiveContainer>
   );
 };
 
